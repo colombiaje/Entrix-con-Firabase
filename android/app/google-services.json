@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "112730238756",
+    "project_id": "entrix-con-firabase",
+    "storage_bucket": "entrix-con-firabase.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:112730238756:android:31a61fb06d2bc1f4370db1",
+        "android_client_info": {
+          "package_name": "com.example.entrix"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "112730238756-42dgm5eopjkr9h7j4tsebn0sim03m38a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.entrix",
+            "certificate_hash": "56279b2854fb2019ca43cb21da7cedf18a288311"
+          }
+        },
+        {
+          "client_id": "112730238756-3k6qelpl7feordmorconuos2tv12ndra.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBA8_y1Nn_OMsJZ4P8p07Aw7YBbGaDb5kw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "112730238756-3k6qelpl7feordmorconuos2tv12ndra.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "112730238756-uco56rmjuqti2mqb9vdahv8mi839fac3.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.entrix"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
