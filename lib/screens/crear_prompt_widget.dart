@@ -108,17 +108,41 @@ class _PromptFormScreenState extends State<PromptFormScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Prompt guardado exitosamente en Firebase.')),
       );
+//21
+      // ... código antes de await ...
 
-      // Limpiar formulario y recargar datos (opcional, pero buena UX)
-      _formKey.currentState!.reset();
-      setState(() {
+      await _appscriptService.enviarPrompt(
+        contextoUso: contextoFinal,
+        propositoUso: propositoFinal,
+        promptTexto: _promptTexto.trim(),
+      );
+
+// 🔹 Añade este print
+      if (kDebugMode) { debugPrint('DEBUG Form: Envio a servicio completado. Intentando mostrar SnackBar...'); }
+
+      // 🔹 Añade este print
+      if (kDebugMode) { debugPrint('DEBUG Form: SnackBar mostrado (o intentado). Intentando resetear formulario...'); }
+
+
+      _formKey.currentState!.reset(); // <--- Linea 2 sospechosa
+
+
+      // 🔹 Añade este print
+      if (kDebugMode) { debugPrint('DEBUG Form: Formulario reseteado. Intentando actualizar estado local...'); }
+
+      setState(() { // <--- Linea 3 sospechosa
         _contextoSeleccionado = null;
         _propositoSeleccionado = null;
         _nuevoContexto = null;
         _nuevoProposito = null;
         _promptTexto = '';
-        propositosFiltrados = []; // Limpiar propositos filtrados
+        propositosFiltrados = [];
       });
+
+      // 🔹 Añade este print
+      if (kDebugMode) { debugPrint('DEBUG Form: Estado local actualizado.'); }
+
+      //22
 
       // await cargarDatos(); // Recargar opciones si el nuevo contexto/proposito debe aparecer en los dropdowns inmediatamente
       // Nota: Recargar puede ser lento si tienes muchos datos. Considera solo limpiar formulario.

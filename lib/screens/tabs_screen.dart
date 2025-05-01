@@ -2,8 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:entrix/screens/crear_prompt_widget.dart';
 import 'package:entrix/screens/consulta_prompt_widget.dart';
 
-import 'package:flutter/material.dart';
-
 // Si tu pantalla principal ya existe y tiene otro nombre de clase,
 // puedes usar ese nombre en lugar de TabsScreen, pero asegúrate
 // de que el import en main.dart coincida.
@@ -41,11 +39,13 @@ class EntrixTabsScreen extends StatelessWidget {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Entrix'),
-          bottom: const TabBar(
+          bottom: TabBar( // 🔹 QUITAMOS el 'const' aquí porque añadiremos una propiedad
             tabs: [
-              Tab(text: 'Crear Prompt'),
-              Tab(text: 'Consultar Prompts'),
+              Tab(text: 'Crear Prompt'), // 🔹 QUITAMOS el 'const' aquí
+              Tab(text: 'Consultar Prompts'), // 🔹 QUITAMOS el 'const' aquí
             ],
+            indicatorColor: Colors.green[700], // 🔹 AÑADIMOS esta línea con un color verde más oscuro
+            // Puedes ajustar el color según prefieras, ej: Colors.teal[700], Colors.lightGreen[900]
           ),
         ),
         body: const TabBarView(
