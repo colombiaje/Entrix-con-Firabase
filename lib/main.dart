@@ -1,15 +1,11 @@
 import 'package:firebase_core/firebase_core.dart';
-// Ya no necesitamos firebase_auth aquí temporalmente
-// import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // 🔹 Asegura que este import este presente
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 
-// Importa tu pantalla principal real que contiene las pestañas
-// Asegurate que la ruta y el nombre del archivo son correctos
+// Importa tus pantallas. Asegurate que las rutas y nombres son correctos.
+import 'package:entrix/screens/login_page.dart'; // 🔹 Asegura que este import este presente
 import 'package:entrix/screens/tabs_screen.dart'; // Asumiendo que EntrixTabsScreen está en este archivo
-
-// Ya no necesitamos importar la pantalla de login temporalmente
-// import 'package:entrix/screens/login_page.dart';
 
 
 void main() async {
@@ -29,13 +25,27 @@ class MyApp extends StatelessWidget {
         primarySwatch: Colors.blue, // Tu tema
         visualDensity: VisualDensity.adaptivePlatformDensity,
       ),
-      // 🔹 TEMPORALMENTE: Mostramos directamente tu pantalla principal con pestañas
-      // para poder probar las funcionalidades de Prompts.
-      // Volveremos a poner la lógica de autenticación del StreamBuilder después.
-      home: EntrixTabsScreen(), // <-- Apunta directamente a tu Widget principal real
+      // 🔹 Restauramos el StreamBuilder para escuchar cambios en el estado de autenticación
+      home: StreamBuilder<User?>( // User? viene de firebase_auth
+        stream: FirebaseAuth.instance.authStateChanges(), // Este stream emite eventos cuando el usuario inicia/cierra sesión
+        builder: (context, snapshot) {
+          // Verifica si la conexión al stream tiene datos (estado de auth)
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            // Muestra un indicador de carga mientras espera el estado de auth
+            return const CircularProgressIndicator(); // 🔹 Añadimos const
+          }
+
+          // Si el stream tiene datos y hay un usuario (snapshot.hasData es true y snapshot.data no es null)
+          if (snapshot.hasData && snapshot.data != null) {
+            // El usuario está logueado, muestra la pantalla principal (ej. Tabs)
+            return const EntrixTabsScreen(); // 🔹 Restauramos y aseguramos que apunta a tu Widget principal real
+          } else {
+            // El usuario NO está logueado, muestra la pantalla de inicio de sesión
+            return const LoginPage(); // 🔹 Restauramos y aseguramos que apunta a tu Widget de login
+          }
+        },
+      ),
+      // La línea temporal home: EntrixTabsScreen(),; ha sido eliminada
     );
   }
 }
-
-// Nota: Una vez que termines las pruebas, volveremos a modificar main.dart
-// para usar la lógica de autenticación con StreamBuilder nuevamente.

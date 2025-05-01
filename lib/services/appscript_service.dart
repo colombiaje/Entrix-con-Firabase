@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart'; // Para debugPrint
+import 'package:firebase_auth/firebase_auth.dart'; // Importa FirebaseAuth para posible uso de userId
+// Puedes importar dart:collection si usas Set o LinkedHashSet
+// import 'dart:collection';
 
 // Ya no necesitamos la URL base ni el paquete http
 // import 'dart:convert';
@@ -7,277 +10,253 @@ import 'package:flutter/foundation.dart'; // Para debugPrint
 // const String baseUrl = '...';
 
 // Usaremos una clase para organizar los métodos del servicio
-class AppscriptService { // Mantenemos el nombre de la clase por ahora
+class AppscriptService {
 
-  // Instancia de Firestore
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
+  // Instancia de Firestore (usar solo una convención, por ejemplo _firestore)
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Referencia a la colección 'prompts' (asegúrate de que este nombre coincide con tu plan 'prompts')
-  final CollectionReference promptsCollection = FirebaseFirestore.instance.collection('prompts');
+  // Puedes usar una referencia a la colección si lo prefieres, pero a menudo
+  // es más directo llamando a _firestore.collection() donde la necesitas.
+  // final CollectionReference promptsCollection = FirebaseFirestore.instance.collection('prompts');
 
 
-  /// 🔹 Enviar un nuevo prompt a Firestore (adaptado de 'addPrompt')
-  // El retorno cambia de Future<String> a Future<void>
+  /// 🔹 Enviar un nuevo prompt a Firestore
   Future<void> enviarPrompt({
     required String contextoUso,
     required String propositoUso,
     required String promptTexto,
   }) async {
-    if (kDebugMode) { debugPrint('DEBUG Service: Iniciando enviarPrompt...'); } // 🔹 Añade esto
+    if (kDebugMode) { debugPrint('DEBUG Service: Iniciando enviarPrompt...'); }
     try {
-      // ... tu código actual de Firestore .add() ...
-      await promptsCollection.add({
+      // 🔹 Añade un nuevo documento a la colección 'prompts'
+      await _firestore.collection('prompts').add({
         'contextoUso': contextoUso,
         'propositoUso': propositoUso,
         'prompt': promptTexto,
-        'fechaCreacion': FieldValue.serverTimestamp(),
+        'fechaCreacion': FieldValue.serverTimestamp(), // Usa Timestamp del servidor
+        // Opcional: añadir userId del usuario logueado
+        // 'userId': FirebaseAuth.instance.currentUser?.uid, // Descomentar si quieres guardar el ID del usuario
       });
 
       if (kDebugMode) {
-        debugPrint('DEBUG Service: Prompt guardado exitosamente en Firestore.'); // 🔹 Esto ya estaba, verifica que esté
+        debugPrint('DEBUG Service: Prompt guardado exitosamente en Firestore.');
       }
 
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('DEBUG Service: Error al enviar prompt a Firestore: $e'); // 🔹 Esto ya estaba, verifica que esté
+        debugPrint('DEBUG Service: Error al enviar prompt a Firestore: $e');
       }
-      throw Exception('Fallo al guardar prompt en Firebase: $e');
+      // Es mejor relanzar el error original
+      throw e; // Mantén el stack trace
     }
-    if (kDebugMode) { debugPrint('DEBUG Service: Fin de enviarPrompt.'); } // 🔹 Añade esto al final del try (antes del catch si hubiera)
+    if (kDebugMode) { debugPrint('DEBUG Service: Fin de enviarPrompt.'); }
   }
 
-  /// 🔹 Leer opciones únicas desde Firestore (adaptado de 'getOptions')
-  // NOTA: Obtener opciones únicas directamente de Firestore requiere leer documentos
-  // y procesarlos. Para grandes cantidades de datos, esto podría ser ineficiente.
-  // Alternativas: guardar opciones en un documento/colección separada o usar Cloud Functions.
-  // Aquí, leemos todos los prompts para extraer los valores únicos, similar a como tu script podría haberlo hecho.
+  /// 🔹 Leer opciones únicas desde Firestore (lista plana)
   Future<Map<String, List<String>>> obtenerOpcionesUnicas() async {
+    if (kDebugMode) { debugPrint('DEBUG Service: Iniciando obtenerOpcionesUnicas...'); }
     try {
-      QuerySnapshot snapshot = await promptsCollection.get();
+      QuerySnapshot snapshot = await _firestore.collection('prompts').get();
 
       Set<String> contextoUnico = {};
       Set<String> propositoUnico = {};
 
       for (var doc in snapshot.docs) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        if (data.containsKey('contextoUso') && data['contextoUso'] is String) {
+        // Verificaciones de tipo y si no están vacíos
+        if (data.containsKey('contextoUso') && data['contextoUso'] is String && (data['contextoUso'] as String).isNotEmpty) {
           contextoUnico.add(data['contextoUso']);
         }
-        if (data.containsKey('propositoUso') && data['propositoUso'] is String) {
+        if (data.containsKey('propositoUso') && data['propositoUso'] is String && (data['propositoUso'] as String).isNotEmpty) {
           propositoUnico.add(data['propositoUso']);
         }
       }
 
+      // Convertir Sets a listas y ordenar
+      List<String> contextosList = contextoUnico.toList()..sort();
+      List<String> propositosList = propositoUnico.toList()..sort();
+
+
+      if (kDebugMode) {
+        debugPrint('DEBUG Service: Opciones únicas obtenidas. Contextos: ${contextosList.length}, Propositos: ${propositosList.length}');
+      }
+
       return {
-        'contexto': contextoUnico.toList(),
-        'proposito': propositoUnico.toList(),
+        'contexto': contextosList,
+        'proposito': propositosList,
       };
 
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error al obtener opciones únicas de Firestore: $e');
+        debugPrint('DEBUG Service: Error al obtener opciones únicas de Firestore: $e');
       }
-      throw Exception('Error al obtener opciones únicas: $e');
+      // Es mejor relanzar el error original
+      throw e;
     }
   }
 
-  /// 🔹 Agrupa los propósitos por contexto desde Firestore (adaptado del original)
-  // NOTA: Igual que la anterior, puede ser ineficiente para muchos datos.
+  /// 🔹 Agrupa los propósitos por contexto desde Firestore (mapa)
   Future<Map<String, List<String>>> obtenerOpcionesUnicasAgrupadas() async {
+    if (kDebugMode) { debugPrint('DEBUG Service: Iniciando obtenerOpcionesUnicasAgrupadas...'); }
     try {
-      QuerySnapshot snapshot = await promptsCollection.get();
+      QuerySnapshot snapshot = await _firestore.collection('prompts').get();
 
       Map<String, Set<String>> propositoPorContexto = {};
 
       for (var doc in snapshot.docs) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        String contexto = data.containsKey('contextoUso') && data['contextoUso'] is String
-            ? data['contextoUso'] : 'Sin Contexto'; // Asigna un valor por defecto si falta
-        String proposito = data.containsKey('propositoUso') && data['propositoUso'] is String
-            ? data['propositoUso'] : 'Sin Propósito'; // Asigna un valor por defecto
+        String? contexto = data.containsKey('contextoUso') && data['contextoUso'] is String
+            ? data['contextoUso'] as String? : null;
+        String? proposito = data.containsKey('propositoUso') && data['propositoUso'] is String
+            ? data['propositoUso'] as String? : null;
 
-        if (!propositoPorContexto.containsKey(contexto)) {
-          propositoPorContexto[contexto] = {};
+        // Solo procesar si ambos campos existen y no son nulos/vacios
+        if (contexto != null && contexto.isNotEmpty && proposito != null && proposito.isNotEmpty) {
+          if (!propositoPorContexto.containsKey(contexto)) {
+            propositoPorContexto[contexto] = {};
+          }
+          propositoPorContexto[contexto]!.add(proposito);
         }
-        propositoPorContexto[contexto]!.add(proposito);
       }
 
       Map<String, List<String>> resultado = {};
       propositoPorContexto.forEach((contexto, propositos) {
-        resultado[contexto] = propositos.toList();
+        List<String> propositosList = propositos.toList()..sort(); // Ordenar los propósitos dentro de cada contexto
+        resultado[contexto] = propositosList;
       });
 
+      if (kDebugMode) { debugPrint('DEBUG Service: Opciones agrupadas obtenidas. ${resultado.length} contextos.'); }
       return resultado;
 
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error al obtener opciones agrupadas de Firestore: $e');
+        debugPrint('DEBUG Service: Error al obtener opciones agrupadas de Firestore: $e');
       }
-      throw Exception('Error al obtener opciones agrupadas: $e');
+      // Es mejor relanzar el error original
+      throw e;
     }
   }
 
 
-  /// 🔹 Consultar Prompts por Contexto y Proposito desde Firestore (adaptado de 'queryPrompts')
-  // El retorno cambia de Future<List<Map<String, dynamic>>> a Future<List<Map<String, dynamic>>>
-  // para mantener la compatibilidad con el llamador, aunque el patrón ideal de Firestore
-  // para UI que escucha cambios sería Stream<List<Map<String, dynamic>>>
+  /// 🔹 Consultar Prompts por Contexto y Proposito desde Firestore
+  // Ahora devuelve Future<List<Map<String, dynamic>>> y los ordena por fecha
   Future<List<Map<String, dynamic>>> consultarPromptsPorContextoYProposito(
       String contexto, String proposito) async {
+    if (kDebugMode) { debugPrint('DEBUG Service: Iniciando consultarPromptsPorContextoYProposito con Contexto: $contexto, Proposito: $proposito'); }
     try {
-      Query query = promptsCollection; // Empieza con la colección
+      Query query = _firestore.collection('prompts'); // Empieza con la colección
 
       // Aplica filtros WHERE si los parámetros no están vacíos
       if (contexto.isNotEmpty) {
         query = query.where('contextoUso', isEqualTo: contexto);
       }
       if (proposito.isNotEmpty) {
-        // Para aplicar multiples filtros de igualdad, puedes encadenar .where()
         query = query.where('propositoUso', isEqualTo: proposito);
-        // NOTA: Firestore requiere índices compuestos para ciertas combinaciones de filtros
-        // Si tienes un error de Firestore sobre índices, la consola de Firebase te dará el enlace para crearlo.
       }
+
+      // 🔹 AÑADIMOS ESTA LÍNEA para ordenar por fecha (más reciente primero)
+      // ESTA LÍNEA COMBINADA CON LOS FILTROS WHERE REQUIERE UN ÍNDICE COMPUESTO EN FIRESTORE.
+      query = query.orderBy('fechaCreacion', descending: true);
 
       // Ejecuta la consulta
       QuerySnapshot snapshot = await query.get();
 
       // Mapea los documentos de la consulta a List<Map<String, dynamic>>
-      // Aseguramos que incluimos el ID del documento generado por Firestore
       List<Map<String, dynamic>> promptsList = snapshot.docs.map((doc) {
         Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
         data['id'] = doc.id; // Añade el ID del documento al mapa
-        // Firestore Timestamp a DateTime si es necesario
+        // Convierte el Timestamp a String legible si es necesario
         if(data.containsKey('fechaCreacion') && data['fechaCreacion'] is Timestamp){
-          data['fechaCreacion'] = (data['fechaCreacion'] as Timestamp).toDate().toString(); // O al formato que necesites
+          data['fechaCreacion'] = (data['fechaCreacion'] as Timestamp).toDate().toString(); // Convertir a String legible
+        } else if (!data.containsKey('fechaCreacion') || data['fechaCreacion'] == null) {
+          data['fechaCreacion'] = 'Fecha no disponible'; // Manejar si el campo no existe o es null
         }
+        // Asegurarse de que contextoUso y propositoUso son Strings para consistencia en UI
+        if (!data.containsKey('contextoUso') || !(data['contextoUso'] is String)) {
+          data['contextoUso'] = 'Sin Contexto';
+        }
+        if (!data.containsKey('propositoUso') || !(data['propositoUso'] is String)) {
+          data['propositoUso'] = 'Sin Propósito';
+        }
+
         return data;
       }).toList();
 
       if (kDebugMode) {
-        debugPrint('Consulta de prompts exitosa. ${promptsList.length} resultados.');
+        debugPrint('DEBUG Service: Consulta de prompts exitosa. ${promptsList.length} resultados.');
       }
 
       return promptsList;
 
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error al consultar prompts en Firestore: $e');
+        debugPrint('DEBUG Service: Error al consultar prompts en Firestore: $e');
       }
-      throw Exception('Fallo al consultar prompts en Firebase: $e');
+      // Es mejor relanzar el error original para que el widget lo maneje
+      throw e;
     }
   }
 
-  /// 🔹 Actualizar Prompt en Firestore (adaptado de 'updatePrompt')
-  // El retorno cambia de Future<bool> a Future<bool> (manejamos el éxito/fallo)
+  /// 🔹 Actualizar Prompt en Firestore
   Future<bool> actualizarPrompt({
     required String id,
     required String nuevoTexto,
   }) async {
+    if (kDebugMode) { debugPrint('DEBUG Service: Iniciando actualizarPrompt para ID: $id'); }
     try {
-      // Referencia al documento específico usando el ID
-      DocumentReference promptDoc = promptsCollection.doc(id);
+      DocumentReference promptDoc = _firestore.collection('prompts').doc(id);
 
-      // Actualiza el campo 'prompt'
       await promptDoc.update({
         'prompt': nuevoTexto,
-        // Puedes añadir una marca de tiempo de última actualización si lo necesitas
+        // Opcional: añadir una marca de tiempo de última actualización
         // 'fechaActualizacion': FieldValue.serverTimestamp(),
       });
 
       if (kDebugMode) {
-        debugPrint('Prompt actualizado exitosamente en Firestore: ID $id');
+        debugPrint('DEBUG Service: Prompt actualizado exitosamente en Firestore: ID $id');
       }
 
-      return true; // Indica éxito
+      return true;
 
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error al actualizar prompt en Firestore (ID: $id): $e');
+        debugPrint('DEBUG Service: Error al actualizar prompt en Firestore (ID: $id): $e');
       }
-      // Devuelve false en caso de error
-      // Puedes lanzar una excepción si prefieres que el llamador maneje errores específicos
-      // throw Exception('Fallo al actualizar prompt en Firebase: $e');
-      return false; // Indica fallo
+      throw e; // Re-lanzar para que el widget lo maneje
     }
   }
 
-  /// 🔹 Eliminar un prompt en Firestore (adaptado de 'deletePrompt')
-  // El retorno cambia de Future<bool> a Future<bool> (manejamos el éxito/fallo)
+  /// 🔹 Eliminar un prompt en Firestore
   Future<bool> eliminarPrompt({required String id}) async {
+    if (kDebugMode) { debugPrint('DEBUG Service: Iniciando eliminarPrompt para ID: $id'); }
     try {
-      // Referencia al documento específico usando el ID
-      DocumentReference promptDoc = promptsCollection.doc(id);
+      DocumentReference promptDoc = _firestore.collection('prompts').doc(id);
 
-      // Elimina el documento
       await promptDoc.delete();
 
       if (kDebugMode) {
-        debugPrint('Prompt eliminado exitosamente en Firestore: ID $id');
+        debugPrint('DEBUG Service: Prompt eliminado exitosamente en Firestore: ID $id');
       }
 
-      return true; // Indica éxito
+      return true;
 
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('Error al eliminar prompt en Firestore (ID: $id): $e');
+        debugPrint('DEBUG Service: Error al eliminar prompt en Firestore (ID: $id): $e');
       }
-      // Devuelve false en caso de error
-      // Puedes lanzar una excepción si prefieres que el llamador maneje errores específicos
-      // throw Exception('Fallo al eliminar prompt en Firebase: $e');
-      return false; // Indica fallo
+      throw e; // Re-lanzar para que el widget lo maneje
     }
   }
-
-  // --- Métodos adicionales que podrías querer en el futuro ---
-
-  /// Obtener un solo prompt por ID
-  Future<Map<String, dynamic>?> getPromptById(String id) async {
+//contextoUso Ascendente propositoUso Ascendente fechaCreacion Ascendente __name__ Ascendente
+  // Opcional: Método para cerrar sesión
+  Future<void> signOut() async {
+    if (kDebugMode) { debugPrint('DEBUG Service: Iniciando cierre de sesión.'); }
     try {
-      DocumentSnapshot doc = await promptsCollection.doc(id).get();
-      if (doc.exists) {
-        Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-        data['id'] = doc.id; // Añade el ID del documento
-        if(data.containsKey('fechaCreacion') && data['fechaCreacion'] is Timestamp){
-          data['fechaCreacion'] = (data['fechaCreacion'] as Timestamp).toDate().toString();
-        }
-        return data;
-      }
-      return null; // Retorna null si el documento no existe
+      await FirebaseAuth.instance.signOut();
+      if (kDebugMode) { debugPrint('DEBUG Service: Sesión cerrada exitosamente.'); }
     } catch (e) {
-      if (kDebugMode) {
-        debugPrint('Error getting prompt by ID ($id) from Firestore: $e');
-      }
-      throw Exception('Failed to get prompt from Firebase: $e');
+      if (kDebugMode) { debugPrint('DEBUG Service: Error al cerrar sesión: $e'); }
+      throw e; // Re-lanzar
     }
   }
-
-// Nota: Para pantallas que necesitan actualizarse en tiempo real
-// (como una lista de prompts), la mejor práctica de Firestore es usar Streams.
-// Por ejemplo:
-/*
-  Stream<List<Map<String, dynamic>>> streamPrompts({String? contexto, String? proposito}) {
-      Query query = promptsCollection;
-       if (contexto != null && contexto.isNotEmpty) {
-        query = query.where('contextoUso', isEqualTo: contexto);
-      }
-      if (proposito != null && proposito.isNotEmpty) {
-         query = query.where('propositoUso', isEqualTo: proposito);
-      }
-      // Puedes añadir ordenación si lo necesitas:
-      // query = query.orderBy('fechaCreacion', descending: true);
-
-      return query.snapshots().map((snapshot) {
-          return snapshot.docs.map((doc) {
-              Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-              data['id'] = doc.id;
-              if(data.containsKey('fechaCreacion') && data['fechaCreacion'] is Timestamp){
-                 data['fechaCreacion'] = (data['fechaCreacion'] as Timestamp).toDate().toString();
-              }
-              return data;
-          }).toList();
-      });
-  }
-  */
-
-
 }
